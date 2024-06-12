@@ -14,6 +14,61 @@ namespace Task_Analyzer.Controllers
             _db = db;
         }
 
+        public async Task<IActionResult> Index()
+        {
+            IEnumerable<Models.Task> tasks = await _db.Tasks.OrderBy(t => t.Priority).ToListAsync();
+
+            int total = tasks.Count();
+            int completed = 0;
+            int pending = 0;
+            int overdue = 0;
+
+            List<Models.Task> seriousTasks = new List<Models.Task>();
+
+            foreach(Models.Task t in tasks)
+            {
+                TimeSpan difference = t.DueDate - DateTime.Today;
+                int dayGap = (int)difference.TotalDays;
+
+                if(dayGap <= 1 && !t.IsCompleted) seriousTasks.Add(t);
+
+                if (t.IsCompleted) completed++;
+                else if(!t.IsCompleted && DateTime.Now > t.DueDate) overdue++;
+                else if(!t.IsCompleted) pending++;
+            }
+
+            ViewBag.total = total;
+            ViewBag.completed = completed;
+            ViewBag.pending = pending;
+            ViewBag.overdue = overdue;
+            ViewBag.seriousTasks = seriousTasks;
+
+            return View(tasks);
+        }
+        public IActionResult Create()
+        {
+            return View();
+        }
+        [HttpPost]
+        public async Task<IActionResult> Create(Models.Task model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            if(DateTime.Now > model.DueDate)
+            {
+                TempData["Error"] = "Task due date can not be set to past!";
+                return View(model);
+            }
+
+            _db.Add(model);
+            await _db.SaveChangesAsync();
+
+            TempData["Success"] = "Task created successfully!";
+            return RedirectToAction("Create");
+        }
         [HttpGet]
         public async Task<IActionResult> UpdateStatus(int? id)
         {
